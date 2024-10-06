@@ -1,0 +1,8 @@
+mlflow
+dvc
+pyopenssl==24.0.0
+xgboost
+feature-engine
+loguru
+holidays==0.24
+prophet==1.1.2
