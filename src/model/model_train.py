@@ -1,3 +1,4 @@
+import os
 import json
 from datetime import datetime
 from sqlalchemy import create_engine
@@ -9,7 +10,8 @@ from prophet.diagnostics import performance_metrics
 import itertools
 import numpy as np
 import mlflow
-from mlflow.models import infer_signature
+from mlflow.tracking import MlflowClient
+from mlflow.entities import ViewType
 import logging
 from airflow.hooks.postgres_hook import PostgresHook
 import requests
@@ -27,10 +29,10 @@ ALERTMANAGER_URL = "http://172.17.0.1:9093/api/v1/alerts"
 #     }
 
 param_grid = {  
-    'changepoint_prior_scale': [0.001],
+    'changepoint_prior_scale': [0.01],
     'seasonality_prior_scale': [0.1],
-    'holidays_prior_scale': [0.1],
-    'seasonality_mode': ['multiplicative']
+    'holidays_prior_scale': [0.01],
+    'seasonality_mode': ['additive']
     }
 
 
@@ -45,15 +47,13 @@ def train(**kwargs):
     period = horizon / 4 
     input_example = df[:int(0.05*(df.shape[0]))]
     mlflow.set_experiment("time series")
-
     with mlflow.start_run() as run:
-        mlflow.set_experiment("time series")
         run_id = run.info.run_id
         logger.info(f"\nActive run_id: {run_id}")
         all_params = [dict(zip(param_grid.keys(), v)) for v in itertools.product(*param_grid.values())]
         rmses = []
         for params in all_params:
-            m = Prophet(**params).fit(df)  # Fit model with given params
+            m = Prophet(**params).fit(df)  
             df_cv = cross_validation(m, initial='{} days'.format(initial),
                 period='{} days'.format(period), horizon = '{} days'.format(horizon))
             logger.info(df_cv)
@@ -82,6 +82,21 @@ def train(**kwargs):
                                  registered_model_name="prophet")
         model_uri = mlflow.get_artifact_uri("prophet")
     return run_id, model_uri
+
+def register_best_model(top_n: int) -> None:
+    client = MlflowClient()
+    logger.info("Registrando el mejor modelo...")
+    experiment = client.get_experiment_by_name("time series")
+    runs = client.search_runs(
+        experiment_ids=experiment.experiment_id,
+        run_view_type=ViewType.ACTIVE_ONLY,
+        max_results=top_n,
+        order_by=["metrics.RMSE ASC"]
+    )
+    best_run = runs[0]
+    best_model_uri = f"runs:/{best_run.info.run_id}/prophet"
+    mlflow.register_model(model_uri=best_model_uri, name="prophet_mejorado")
+    logger.info(f"Registrado el modelos {best_model_uri} como 'Mejor modelo'")
 
 def execute():
     hook = PostgresHook(postgres_conn_id="postgres")

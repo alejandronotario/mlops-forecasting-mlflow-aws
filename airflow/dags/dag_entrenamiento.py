@@ -5,9 +5,10 @@ import airflow
 from airflow import DAG
 from airflow.operators.python import PythonOperator
 import logging
+from mlflow.tracking import MlflowClient
 from src.data.data import read_first_record_from_postgres, read_last_record_from_postgres, load_interval_data
 from src.data.data import load_incremental_data, get_data
-from src.model.model_train import train
+from src.model.model_train import train, register_best_model
 
 logger = logging.getLogger(__name__)
 
@@ -80,5 +81,13 @@ model_train = PythonOperator(
     python_callable=train, dag=dag
 )
 
+register_model = PythonOperator(
+    task_id="register_model",
+    op_kwargs={
+        'top_n': 4
+    },
+    python_callable=register_best_model, dag=dag
+)
 
-read_last_record >> get_gas_data >> load_incremental_gas_data >> [get_first_record, get_last_record] >> load_train_data >> model_train 
+
+read_last_record >> get_gas_data >> load_incremental_gas_data >> [get_first_record, get_last_record] >> load_train_data >> model_train >> register_model
