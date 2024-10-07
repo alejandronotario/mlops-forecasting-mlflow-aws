@@ -36,7 +36,7 @@ Se incluye un simulador que proporciona el dataframe de entrada del modelo con f
 
 ```mermaid
 flowchart LR
-    A(Postman) -->|POST rango de fehas| B(Ejecución) -->|POST rango de fehas| A(Postman)
+    A(Postman) -->|POST rango de fechas| B(Ejecución) -->|POST rango de fechas| A(Postman)
 ```
 - __Datos de control__
 

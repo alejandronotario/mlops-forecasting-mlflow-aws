@@ -1,0 +1,45 @@
+default:
+  image: ubuntu:latest
+
+deploy-prod:
+  only:
+    - main
+  stage: deploy
+  before_script:
+    - ls -la
+    - pwd
+    - 'which ssh-agent || ( apt-get update -y && apt-get install openssh-client -y )'
+    - eval $(ssh-agent -s)
+    - mkdir -p ~/.ssh
+    - chmod 700 ~/.ssh
+    - cat $SSH_KEY_EC2
+    - echo "$(cat $SSH_KEY_EC2)" >> ~/.ssh/ssh-key.pem
+    - chmod 400 ~/.ssh/ssh-key.pem
+    - cat ~/.ssh/ssh-key.pem
+    - echo -e "Host *\n\tStrictHostKeyChecking no\n\n" > ~/.ssh/config
+    - apt-get update -y
+    - apt-get -y install rsync
+  script:
+    - >- 
+      ssh -i ~/.ssh/ssh-key.pem ubuntu@$EC2_ADDRESS \
+      'git config --global --replace-all user.name "alejandronotario"
+      && git config --global --replace-all user.email "alejandronotario@gmail.com"
+      '
+    - >-
+      ssh -i ~/.ssh/ssh-key.pem ubuntu@$EC2_ADDRESS \
+      '     
+      cd prueba_despliegue
+      && git status
+      && git pull --rebase
+      && chmod +x ./set_up.sh
+      && chmod 777 -R ./
+      && git status
+      && ./set_up.sh
+      '
+    - >-
+      ssh -i ~/.ssh/ssh-key.pem ubuntu@$EC2_ADDRESS \
+      'cd prueba_despliegue &&
+      if [ docker ps | grep -q keyword ]; 
+      then sudo docker compose down && sudodocker compose up -d --build; 
+      else sudo docker compose up -d --build; 
+      fi;'
