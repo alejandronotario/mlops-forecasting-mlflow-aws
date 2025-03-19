@@ -1,4 +1,4 @@
-# fantastic-train
+# mlops-forecasting-mlflow-aws
 
 Se propone un infraestructura para entrenar modelos de Aprendizaje Automático
 
